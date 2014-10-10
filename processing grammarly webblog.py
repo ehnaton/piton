@@ -16,15 +16,15 @@ from BeautifulSoup import BeautifulSoup
 from socket import error as SocketError
 import errno
 
-shared_folder="/vagrant"
+shared_folder= "vagrant"
 blogs_file = 'blogs.json'
 blogs2_file = 'feeds_2.json'
 url_string = "http://www.grammarly.com/blog/page/{0}/"
 
-def extract_blog_posts(url_string):
+def extract_blog_posts(url_string, PAGES = 48):
     blog_posts = []
     page_count = 0
-    PAGES = 48
+    
     while(page_count<=PAGES):
         page_count+=1
         url = url_string.format(page_count)
@@ -43,18 +43,18 @@ def extract_blog_posts(url_string):
             headers = article[i].find_elements_by_tag_name("header")
         for header in headers:
             article_a = header.find_elements_by_xpath("//h1/a[@title]")
-                     
+        print 'extracting ...'             
         for e in article_a:
             extractor = Extractor(extractor = 'ArticleExtractor', url = e.get_attribute('href'))
             texts = extractor.getText()    
-    
+            
             blog_posts.append({'title': e.text, 'content': clean_html(texts), 'link': e.get_attribute('href')})
             return blog_posts
 
 blog_posts = extract_blog_posts(url_string)  
 
 def save_blog_posts_to(file_name, blog_posts):
-    #saved to a dict
+    #save to a dict
     out_file = os.path.join(shared_folder, file_name)
     f = open(out_file, 'w')
     f.write(json.dumps(blog_posts, indent=1))
@@ -63,7 +63,7 @@ def save_blog_posts_to(file_name, blog_posts):
 
 save_blog_posts_to(shared_folder, blogs_file)
 
-#saved to a list
+#save to a list
 blog_data = json.loads(os.path.join(shared_folder, blogs_file).read())
 list_blogs = []
 for post in  blog_data:
@@ -72,7 +72,7 @@ out_file = os.path.join(shared_folder, blogs2_file)
 f = open(out_file, 'w')
 f.write(json.dumps(list_blogs, indent=1))
 f.close()
-
+print 'Wrote to %s' % ( f.name, )
 blog_data = json.loads(open(os.path.join(shared_folder,blogs_file).read())
 
 # Customize the list of stopwords, add common
