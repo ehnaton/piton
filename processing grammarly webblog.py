@@ -7,7 +7,7 @@ from selenium import webdriver
 driver = webdriver.Firefox()
 
 from nltk import clean_html
-nltk.download('stopwords')
+from nltk.stem import PorterStemmer
 import json
 
 from boilerpipe.extract import Extractor
@@ -20,6 +20,8 @@ shared_folder= "vagrant"
 blogs_file = 'blogs.json'
 blogs2_file = 'feeds_2.json'
 url_string = "http://www.grammarly.com/blog/page/{0}/"
+
+stemmer = PorterStemmer()
 
 stop_words = nltk.corpus.stopwords.words('english') + [
     '.',
@@ -81,13 +83,12 @@ def save_blog_posts_to(file_name, blog_posts):
     f.close()
     print 'Wrote to %s' % ( f.name, )
 
-def words_distribution_of_text(BLOG_DATA):    
-    posts = json.loads(open(BLOG_DATA).read())
+def words_distribution_of_text(posts):    
     texts = u",".join([post_block['content'] for post_block in posts])
     
     sentences = nltk.tokenize.sent_tokenize(texts)
     
-    words = [w.lower() for sentence in sentences for w in
+    words = [stemmer.stem(w.lower()) for sentence in sentences for w in
              nltk.tokenize.word_tokenize(sentence)]
     
     fdist = nltk.FreqDist(words)
@@ -109,7 +110,7 @@ f.close()
 print 'Wrote to %s' % ( f.name, )
 
 #words distribution
-fdist, words, texts = words_distribution_of_text(BLOG_DATA)
+fdist, words, texts = words_distribution_of_text(blog_data)
 num_words = sum([i[1] for i in fdist.items()])
 num_unique_words = len(fdist.keys())
 
@@ -122,7 +123,7 @@ top_10_non_stop_words = [w for w in fdist.items() if w[0]
 print '\tNum Words:'.ljust(25), num_words
 print '\tNum Unique Words:'.ljust(25), num_unique_words
 print '\tNum Hapaxes:'.ljust(25), num_hapaxes
-print '\tTop 10 Most Frequent Words (sans stop words):\n\t\t', \
+print '\tTop 10 Most Frequent Words (without stop words):\n\t\t', \
         '\n\t\t'.join(['%s (%s)'
         % (w[0], w[1]) for w in top_10_non_stop_words])
 print
