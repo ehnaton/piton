@@ -148,7 +148,7 @@ def cluster_texts(texts, clusters=3):
         stop_words=stop_words,
         max_df=0.5,
         min_df=0.1,
-        lowercase=True)
+        strip_accents='unicode')
      
     tfidf_model = vectorizer.fit_transform(texts)
     km_model = KMeans(n_clusters=clusters)
