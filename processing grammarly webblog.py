@@ -116,13 +116,13 @@ num_unique_words = len(fdist.keys())
 # Hapaxes are words that appear only once
 num_hapaxes = len(fdist.hapaxes())
 
-top_10_words_sans_stop_words = [w for w in fdist.items() if w[0]
-                                not in stop_words][:20]
-
+top_10_non_stop_words = [w for w in fdist.items() if w[0]
+                                not in stop_words][:10]
+#print prettify 
 print '\tNum Words:'.ljust(25), num_words
 print '\tNum Unique Words:'.ljust(25), num_unique_words
 print '\tNum Hapaxes:'.ljust(25), num_hapaxes
 print '\tTop 10 Most Frequent Words (sans stop words):\n\t\t', \
         '\n\t\t'.join(['%s (%s)'
-        % (w[0], w[1]) for w in top_10_words_sans_stop_words])
+        % (w[0], w[1]) for w in top_10_non_stop_words])
 print
