@@ -10,16 +10,11 @@ import pymongo # pip install pymongo
 
 
 def oauth_login():
-    # XXX: Go to http://twitter.com/apps/new to create an app and get values
-    # for these credentials that you'll need to provide in place of these
-    # empty string values that are defined as placeholders.
-    # See https://dev.twitter.com/docs/auth/oauth for more information 
-    # on Twitter's OAuth implementation
     
-    CONSUMER_KEY = 'QUJGt51huxEji4gA10HRZpCEV'
-    CONSUMER_SECRET = 'c3JdUFuFh3mmY4tDCVXNf1wLBjrE425dY3YkONaPTB7C7zEmew'
-    OAUTH_TOKEN = '1449820634-gs6ZzPaNOQVk0BYndR5tQdcieCAu409m7dKPyL3'
-    OAUTH_TOKEN_SECRET = 'PrM7KkhS6nQN1mY0PSWb19Gi6mV2UqW7ohGICuRc6vz3k'
+    CONSUMER_KEY = ''
+    CONSUMER_SECRET = ''
+    OAUTH_TOKEN = ''
+    OAUTH_TOKEN_SECRET = ''
         
     auth = twitter.oauth.OAuth(OAUTH_TOKEN, OAUTH_TOKEN_SECRET,
                                CONSUMER_KEY, CONSUMER_SECRET)
@@ -29,10 +24,6 @@ def oauth_login():
 
 def make_twitter_request(twitter_api_func, max_errors=10, *args, **kw): 
     
-    # A nested helper function that handles common HTTPErrors. Return an updated value 
-    # for wait_period if the problem is a 500 level error. Block until the rate limit 
-    # is reset if a rate limiting issue (429 error). Returns None for 401 and 404 errors
-    # which requires special handling by the caller.
     def handle_twitter_http_error(e, wait_period=2, sleep_when_rate_limited=True):
     
         if wait_period > 3600: # Seconds
@@ -130,9 +121,7 @@ def store_friends_followers_ids(twitter_api, screen_name=None, user_id=None,
             print >> sys.stderr, 'Fetched {0} total {1} ids for {2}'.format(total_ids, label, (user_id or screen_name))
             sys.stderr.flush()
         
-            # Consider storing the ids to disk during each iteration to provide an 
-            # an additional layer of protection from exceptional circumstances
-        
+          
             if len(ids) >= limit or response is None:
                 break
                 print >> sys.stderr, 'Last cursor', cursor
@@ -162,13 +151,7 @@ def save_to_mongo(data, mongo_db, mongo_db_coll, auth=None, **mongo_conn_kw):
 def load_from_mongo(mongo_db, mongo_db_coll, return_cursor=False,
                     criteria=None, projection=None, auth=None, **mongo_conn_kw):
     
-    # Optionally, use criteria and projection to limit the data that is 
-    # returned as documented in 
-    # http://docs.mongodb.org/manual/reference/method/db.collection.find/
-    
-    # Consider leveraging MongoDB's aggregations framework for more 
-    # sophisticated queries.
-    
+   
     client = pymongo.MongoClient(**mongo_conn_kw)
     db = client[mongo_db]
     
@@ -185,8 +168,6 @@ def load_from_mongo(mongo_db, mongo_db_coll, return_cursor=False,
     else:
         cursor = coll.find(criteria, projection)
 
-    # Returning a cursor is recommended for large amounts of data
-    
     if return_cursor:
         return cursor
     else:
@@ -217,8 +198,201 @@ def store_user_info(twitter_api, screen_names=None, user_ids=None, database=None
         for profile in response:            
             save_to_mongo(profile, database, 'followers_profiles')
             
-# Go ahead and instantiate an instance of the Twitter API for common use
-# throughout the rest of this notebook.
 
 twitter_api = oauth_login()
 print twitter_api
+
+def harvest_followers_ids(screen_names=[]):
+    for screen_name in screen_names:
+        store_friends_followers_ids(twitter_api, screen_name=screen_name, 
+                                    friends_limit=0, database=screen_name)
+
+        
+harvest_followers_ids(screen_names=[ 'readdle' ])
+
+print "Done"
+
+def harvest_followers_profiles(screen_names=[]): 
+    for screen_name in screen_names:
+        followers_ids = load_from_mongo(screen_name, 'followers_ids')
+        
+        all_ids = [ _id for ids_batch in followers_ids for _id in ids_batch['ids'] ]
+        
+        store_user_info(twitter_api, user_ids=all_ids, database=screen_name)
+
+        
+harvest_followers_profiles(screen_names=[ 'readdle' ])
+
+print "Done."
+
+readdle_followers_counts = sorted([f['followers_count'] 
+                                      for f in load_from_mongo('readdle', 'followers_profiles', 
+                                                         projection={'followers_count' : 1, '_id' : 0})])
+plt.loglog(readdle_followers_counts)
+plt.ylabel("Num Followers")
+plt.xlabel("Follower Rank")
+
+bins = [0,5,10,100,200,300,400,500,1000,4000]
+plt.hist(readdle_followers_counts[:len(readdle_followers_counts)/100*95], bins=bins)
+
+plt.title("Readdle Followers")
+plt.xlabel('Bins (range of popularity for Readdle followers)')
+plt.ylabel('Number of followers in bin')
+
+MIN = 10
+readdle_suspect_followers = [f 
+                                for f in load_from_mongo('readdle', 'followers_profiles', 
+                                                          projection={'followers_count' : 1, 'id' : 1, '_id' : 0})
+                                if f['followers_count'] < MIN]
+
+print "Readdle has {0} 'suspect' followers for MIN={1}".format(len(readdle_suspect_followers), MIN)
+
+readdle_suspect_followers_counts = sorted([f['followers_count'] 
+                                              for f in readdle_suspect_followers], reverse=True)
+
+plt.hist(readdle_suspect_followers_counts)
+plt.title("Readdle Suspect Followers")
+plt.xlabel('Bins (range of followers)')
+plt.ylabel('Number of followers in each bin')
+
+print "{0} of Readdle followers have 0 followers"\
+.format(sum([1 for c in readdle_suspect_followers_counts if c < 1]))
+
+print "{0} of Readdle followers have 1 follower"\
+.format(sum([1 for c in readdle_suspect_followers_counts if c <= 1]))
+
+print "{0} of Readdle followers have less than 3 followers"\
+.format(sum([1 for c in readdle_suspect_followers_counts if c < 3]))
+
+print "{0} of Readdle followers have less than 4 followers"\
+.format(sum([1 for c in readdle_suspect_followers_counts if c < 4]))
+
+print "{0} of Readdle followers have less than 5 followers"\
+.format(sum([1 for c in readdle_suspect_followers_counts if c < 5]))
+
+harvest_followers_ids(screen_names=[ 'ABBYY_Software' ])
+harvest_followers_profiles(screen_names=[ 'ABBYY_Software' ])
+print "Done."
+
+abbyy_followers_counts = sorted([f['followers_count'] 
+                                      for f in load_from_mongo('ABBYY_Software', 'followers_profiles', 
+                                                         projection={'followers_count' : 1, '_id' : 0})])
+                                                         
+plt.loglog(abbyy_followers_counts)
+plt.ylabel("Num Followers")
+plt.xlabel("Follower Rank")
+
+bins = [0,5,10,100,200,300,400,500,1000,4000]
+plt.hist(abbyy_followers_counts[:len(abbyy_followers_counts)/100*98], bins=bins)
+
+plt.title("ABBYY Followers")
+plt.xlabel('Bins (range of popularity for ABBYY followers)')
+plt.ylabel('Number of followers in bin')
+
+MIN = 10
+abbyy_suspect_followers = [f 
+                                for f in load_from_mongo('ABBYY_Software', 'followers_profiles', 
+                                                          projection={'followers_count' : 1, 'id' : 1, '_id' : 0})
+                                if f['followers_count'] < MIN]
+
+abbyy_suspect_followers_counts = sorted([f['followers_count'] 
+                                              for f in abbyy_suspect_followers], reverse=True)
+
+plt.hist(abbyy_suspect_followers_counts)
+plt.title("ABBYY Suspect Followers")
+plt.xlabel('Bins (range of followers)')
+plt.ylabel('Number of followers in each bin')
+print "ABBYY has {0} 'suspect' followers for MIN={1}".format(len(abbyy_suspect_followers), MIN)
+
+print "{0} of ABBYY followers have 0 followers"\
+.format(sum([1 for c in abbyy_suspect_followers_counts if c < 1]))
+
+print "{0} of ABBYY followers have 1 follower"\
+.format(sum([1 for c in abbyy_suspect_followers_counts if c <= 1]))
+
+print "{0} of ABBYY followers have less than 3 followers"\
+.format(sum([1 for c in abbyy_suspect_followers_counts if c < 3]))
+
+print "{0} of ABBYY followers have less than 4 followers"\
+.format(sum([1 for c in abbyy_suspect_followers_counts if c < 4]))
+
+print "{0} of ABBYY followers have less than 5 followers"\
+.format(sum([1 for c in abbyy_suspect_followers_counts if c < 5]))
+
+readdle_followers_ids = set([fid
+                 for ids in load_from_mongo('readdle', 'followers_ids', projection={'ids' : 1})
+                     for fid in ids['ids']
+                 ])
+
+abbyy_followers_ids = set([fid
+                 for ids in load_from_mongo('ABBYY_Software', 'followers_ids', projection={'ids' : 1})
+                     for fid in ids['ids']
+                 ])
+
+# Now, calculate the number of followers in common between each person of interest
+# by using set intersections.
+
+readdle_abbyy_common_followers_ids = readdle_followers_ids & abbyy_followers_ids
+
+print "Readdly and ABBYY have {0} followers in common."\
+.format(len(readdle_abbyy_common_followers_ids))
+
+readdle_suspect_followers_ids = set([f['id'] for f in readdle_suspect_followers])
+
+print "{0} of Readdle 'suspect' followers are from the set that's in common with ABBYY followers"\
+.format(len(readdle_suspect_followers_ids & readdle_abbyy_common_followers_ids))
+
+harvest_followers_ids(screen_names=[ 'thegrizzlylabs' ])
+harvest_followers_profiles(screen_names=[ 'thegrizzlylabs' ])
+print "Done."
+def jaccard(x,y): 
+    return 1.0*len(x & y) / len(x | y)
+
+readdle_abbyy_jaccard = jaccard(readdle_followers_ids, abbyy_followers_ids)
+
+print "Readdle and ABBYY Jaccard Index: {0}".format(readdle_abbyy_jaccard)
+
+grizzly_followers_ids = set([fid
+                 for ids in load_from_mongo('thegrizzlylabs', 'followers_ids', projection={'ids' : 1})
+                     for fid in ids['ids']
+                 ])
+
+grizzly_abbyy_jaccard = jaccard(grizzly_followers_ids, abbyy_followers_ids)
+print "Grizzly and ABBYY Jaccard Index: {0}".format(grizzly_abbyy_jaccard)
+
+readdle_grizzly_jaccard = jaccard(readdle_followers_ids, grizzly_followers_ids)
+print "Readdle and Grizzly Jaccard Index {0}".format(readdle_grizzly_jaccard)
+
+MIN = 10
+grizzly_suspect_followers = [f 
+                                for f in load_from_mongo('thegrizzlylabs', 'followers_profiles', 
+                                                          projection={'followers_count' : 1, 'id' : 1, '_id' : 0})
+                                if f['followers_count'] < MIN]
+
+grizzly_suspect_followers_ids = set([f['id'] for f in grizzly_suspect_followers])
+
+readdle_followers_ids_not_suspect = readdle_followers_ids - readdle_suspect_followers_ids
+
+readdle_abby_jaccard_not_suspect = jaccard(readdle_followers_ids_not_suspect, abbyy_followers_ids)
+print "Readdle and ABBYY Jaccard Index adjusted for suspect followers: {0}"\
+.format(readdle_abby_jaccard_not_suspect)
+
+# Need to define this variable, assuming you've pulled down the data for this account
+
+grizzly_followers_ids = set([fid
+                 for ids in load_from_mongo('thegrizzlylabs', 'followers_ids', projection={'ids' : 1})
+                     for fid in ids['ids']
+                 ])
+
+grizzly_followers_ids_not_suspect = grizzly_followers_ids - grizzly_suspect_followers_ids
+
+grizzly_abbyy_jaccard_not_suspect = jaccard(grizzly_followers_ids_not_suspect, abbyy_followers_ids)
+print "Grizzly and ABBYY Jaccard Index adjusted for suspect followers: {0}"\
+.format(grizzly_abbyy_jaccard_not_suspect)
+
+readdle_grizzly_jaccard_not_suspect = jaccard(readdle_followers_ids_not_suspect, grizzly_followers_ids)
+print "Readdle and Grizzly Jaccard Index adjusted for suspect followers {0}"\
+.format(readdle_grizzly_jaccard_not_suspect)
+
+all_common_followers_ids = grizzly_followers_ids & abbyy_followers_ids & grizzly_followers_ids
+print len(all_common_followers_ids)
