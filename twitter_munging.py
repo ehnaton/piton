@@ -8,7 +8,6 @@ import json
 import twitter # pip install twitter
 import pymongo # pip install pymongo
 
-
 def oauth_login():
     
     CONSUMER_KEY = ''
@@ -198,7 +197,6 @@ def store_user_info(twitter_api, screen_names=None, user_ids=None, database=None
         for profile in response:            
             save_to_mongo(profile, database, 'followers_profiles')
             
-
 twitter_api = oauth_login()
 print twitter_api
 
@@ -207,7 +205,6 @@ def harvest_followers_ids(screen_names=[]):
         store_friends_followers_ids(twitter_api, screen_name=screen_name, 
                                     friends_limit=0, database=screen_name)
 
-        
 harvest_followers_ids(screen_names=[ 'readdle' ])
 
 print "Done"
@@ -220,7 +217,6 @@ def harvest_followers_profiles(screen_names=[]):
         
         store_user_info(twitter_api, user_ids=all_ids, database=screen_name)
 
-        
 harvest_followers_profiles(screen_names=[ 'readdle' ])
 
 print "Done."
