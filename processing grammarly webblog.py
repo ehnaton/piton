@@ -16,6 +16,11 @@ from BeautifulSoup import BeautifulSoup
 from socket import error as SocketError
 import errno
 
+from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import TfidfVectorizer
+import collections
+from pprint import pprint
+
 shared_folder= "vagrant"
 blogs_file = 'blogs.json'
 blogs2_file = 'feeds_2.json'
@@ -127,3 +132,39 @@ print '\tTop 10 Most Frequent Words (without stop words):\n\t\t', \
         '\n\t\t'.join(['%s (%s)'
         % (w[0], w[1]) for w in top_10_non_stop_words])
 print
+
+def process_text(text, stem=True):
+    #Tokenize text and stem words removing punctuation 
+    tokens = nltk.word_tokenize(text)
+     
+    if stem:
+        tokens = [stemmer.stem(t) for t in tokens]
+         
+    return tokens
+
+def cluster_texts(texts, clusters=3):
+    # Transform texts to Tf-Idf coordinates and cluster texts using K-Means
+    vectorizer = TfidfVectorizer(tokenizer=process_text,
+        stop_words=stop_words,
+        max_df=0.5,
+        min_df=0.1,
+        lowercase=True)
+     
+    tfidf_model = vectorizer.fit_transform(texts)
+    km_model = KMeans(n_clusters=clusters)
+    km_model.fit(tfidf_model)
+     
+    clustering = collections.defaultdict(list)
+     
+    for idx, label in enumerate(km_model.labels_):
+        clustering[label].append(idx)
+     
+    return clustering
+    
+#cluster into 5 chunks  
+clusters = cluster_texts(posts, 5)
+#print out the title of blog entry within each cluster group
+for clust in clusters :
+    print "\n************************\n"
+    for filename_key in clusters[clust] :
+        print blog_data[filename_key]['title']
