@@ -168,3 +168,4 @@ for cluster in clusters :
     print "\n************************\n"
     for blog_key in clusters[cluster] :
         print blog_data[blog_key]['title']
+#pprint(dict(clusters))
