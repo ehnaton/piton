@@ -164,7 +164,7 @@ def cluster_texts(texts, clusters=3):
 #cluster into 5 chunks  
 clusters = cluster_texts(posts, 5)
 #print out the title of blog entry within each cluster group
-for clust in clusters :
+for cluster in clusters :
     print "\n************************\n"
-    for filename_key in clusters[clust] :
-        print blog_data[filename_key]['title']
+    for blog_key in clusters[cluster] :
+        print blog_data[blog_key]['title']
